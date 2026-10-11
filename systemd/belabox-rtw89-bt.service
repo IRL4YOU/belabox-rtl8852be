@@ -1,0 +1,12 @@
+[Unit]
+Description=BELABOX: Bluetooth des RTL8852BE auf den Herstellertreiber umstellen
+After=systemd-modules-load.service local-fs.target
+Before=bluetooth.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/rtw89ctl bt-attach
+
+[Install]
+WantedBy=multi-user.target

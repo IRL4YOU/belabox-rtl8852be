@@ -1,0 +1,14 @@
+[Unit]
+Description=BELABOX rtw89: Treiber und Kernel abgleichen
+DefaultDependencies=no
+After=local-fs.target
+Before=systemd-modules-load.service systemd-udev-trigger.service sysinit.target
+ConditionPathExists=/var/lib/belabox-rtw89/state.json
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/rtw89ctl boot
+
+[Install]
+WantedBy=sysinit.target

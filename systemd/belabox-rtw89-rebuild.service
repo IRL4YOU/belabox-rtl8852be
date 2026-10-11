@@ -1,0 +1,12 @@
+[Unit]
+Description=BELABOX rtw89: Treiber nach Kernel-Update neu bauen
+ConditionPathExists=/var/lib/belabox-rtw89/state.json
+
+[Service]
+Type=oneshot
+# Erst nach dem Hochfahren bauen, mit niedriger Priorität; wirksam nach dem nächsten Neustart.
+ExecStartPre=/bin/sleep 90
+ExecStart=/usr/local/sbin/rtw89ctl rebuild
+Nice=19
+CPUSchedulingPolicy=idle
+TimeoutStartSec=3600
