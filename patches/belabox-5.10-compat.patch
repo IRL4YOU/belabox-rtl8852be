@@ -1,0 +1,129 @@
+diff -urN a/Makefile b/Makefile
+--- a/Makefile	2026-10-11 19:01:05
++++ b/Makefile	2026-10-11 19:01:05
+@@ -2,6 +2,8 @@
+ 
+ ifneq ($(KERNELRELEASE),)
+ 
++ccflags-y += -include $(src)/compat.h
++
+ obj-m += rtw89_core_git.o
+ rtw89_core_git-y += core.o \
+ 		    mac80211.o \
+diff -urN a/compat.h b/compat.h
+--- a/compat.h	1970-01-01 01:00:00
++++ b/compat.h	2026-10-11 19:01:05
+@@ -0,0 +1,38 @@
++/* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
++/* Compatibility shims: build the rtw89 6.6-lts driver on the BELABOX/Radxa 5.10.160 kernel. */
++#ifndef RTW89_COMPAT_5_10_H
++#define RTW89_COMPAT_5_10_H
++
++#include <linux/version.h>
++#include <linux/stddef.h>
++#include <linux/ieee80211.h>
++
++#ifndef DECLARE_FLEX_ARRAY
++#define DECLARE_FLEX_ARRAY(TYPE, NAME) \
++	struct { struct { } __empty_ ## NAME; TYPE NAME[]; }
++#endif
++
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 12, 0)
++/* No wiphy mutex before 5.12; the driver serializes with rtwdev->mutex. */
++#define wiphy_lock(w) do { (void)(w); } while (0)
++#define wiphy_unlock(w) do { (void)(w); } while (0)
++#endif
++
++/* Names introduced by later kernels; values are the same bits as the old names. */
++#ifndef IEEE80211_HE_MAC_CAP3_MAX_AMPDU_LEN_EXP_EXT_2
++#define IEEE80211_HE_MAC_CAP3_MAX_AMPDU_LEN_EXP_EXT_2	IEEE80211_HE_MAC_CAP3_MAX_AMPDU_LEN_EXP_VHT_2
++#endif
++#ifndef IEEE80211_HE_MAC_CAP4_AMSDU_IN_AMPDU
++#define IEEE80211_HE_MAC_CAP4_AMSDU_IN_AMPDU		IEEE80211_HE_MAC_CAP4_AMDSU_IN_AMPDU
++#endif
++#ifndef IEEE80211_HE_PHY_CAP3_RX_PARTIAL_BW_SU_IN_20MHZ_MU
++#define IEEE80211_HE_PHY_CAP3_RX_PARTIAL_BW_SU_IN_20MHZ_MU	IEEE80211_HE_PHY_CAP3_RX_HE_MU_PPDU_FROM_NON_AP_STA
++#endif
++#ifndef IEEE80211_HE_PHY_CAP6_TRIG_SU_BEAMFORMING_FB
++#define IEEE80211_HE_PHY_CAP6_TRIG_SU_BEAMFORMING_FB	IEEE80211_HE_PHY_CAP6_TRIG_SU_BEAMFORMER_FB
++#endif
++#ifndef IEEE80211_HE_PHY_CAP7_POWER_BOOST_FACTOR_SUPP
++#define IEEE80211_HE_PHY_CAP7_POWER_BOOST_FACTOR_SUPP	IEEE80211_HE_PHY_CAP7_POWER_BOOST_FACTOR_AR
++#endif
++
++#endif
+diff -urN a/core.c b/core.c
+--- a/core.c	2026-10-11 19:01:05
++++ b/core.c	2026-10-11 19:01:05
+@@ -3982,7 +3982,9 @@
+ 		goto err_free_supported_band;
+ 	}
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+ 	hw->wiphy->sar_capa = &rtw89_sar_capa;
++#endif
+ 
+ 	ret = ieee80211_register_hw(hw);
+ 	if (ret) {
+diff -urN a/mac80211.c b/mac80211.c
+--- a/mac80211.c	2026-10-11 19:01:05
++++ b/mac80211.c	2026-10-11 19:01:05
+@@ -1148,7 +1148,9 @@
+ 	.unassign_vif_chanctx	= rtw89_ops_unassign_vif_chanctx,
+ 	.remain_on_channel		= rtw89_ops_remain_on_channel,
+ 	.cancel_remain_on_channel	= rtw89_ops_cancel_remain_on_channel,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+ 	.set_sar_specs		= rtw89_ops_set_sar_specs,
++#endif
+ 	.sta_rc_update		= rtw89_ops_sta_rc_update,
+ 	.set_tid_config		= rtw89_ops_set_tid_config,
+ #ifdef CONFIG_PM
+diff -urN a/sar.c b/sar.c
+--- a/sar.c	2026-10-11 19:01:05
++++ b/sar.c	2026-10-11 19:01:05
+@@ -268,7 +268,7 @@
+ 	seq_printf(m, "TAS delta: %d\n", tas->delta);
+ }
+ 
+-static int rtw89_apply_sar_common(struct rtw89_dev *rtwdev,
++static int __maybe_unused rtw89_apply_sar_common(struct rtw89_dev *rtwdev,
+ 				  const struct rtw89_sar_cfg_common *sar)
+ {
+ 	enum rtw89_sar_sources src;
+@@ -291,6 +291,7 @@
+ 	return ret;
+ }
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+ static const struct cfg80211_sar_freq_ranges rtw89_common_sar_freq_ranges[] = {
+ 	{ .start_freq = 2412, .end_freq = 2484, },
+ 	{ .start_freq = 5180, .end_freq = 5320, },
+@@ -348,6 +349,7 @@
+ 
+ 	return rtw89_apply_sar_common(rtwdev, &sar_common);
+ }
++#endif /* cfg80211 SAR */
+ 
+ static void rtw89_tas_state_update(struct rtw89_dev *rtwdev)
+ {
+diff -urN a/sar.h b/sar.h
+--- a/sar.h	2026-10-11 19:01:05
++++ b/sar.h	2026-10-11 19:01:05
+@@ -16,13 +16,17 @@
+ 	int (*query_sar_config)(struct rtw89_dev *rtwdev, u32 center_freq, s32 *cfg);
+ };
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+ extern const struct cfg80211_sar_capa rtw89_sar_capa;
++#endif
+ 
+ s8 rtw89_query_sar(struct rtw89_dev *rtwdev, u32 center_freq);
+ void rtw89_print_sar(struct seq_file *m, struct rtw89_dev *rtwdev, u32 center_freq);
+ void rtw89_print_tas(struct seq_file *m, struct rtw89_dev *rtwdev);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+ int rtw89_ops_set_sar_specs(struct ieee80211_hw *hw,
+ 			    const struct cfg80211_sar_specs *sar);
++#endif
+ void rtw89_tas_init(struct rtw89_dev *rtwdev);
+ void rtw89_tas_reset(struct rtw89_dev *rtwdev);
+ void rtw89_tas_track(struct rtw89_dev *rtwdev);
