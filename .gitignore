@@ -1,0 +1,6 @@
+dist/
+__pycache__/
+*.pyc
+*.o
+*.ko
+.DS_Store
