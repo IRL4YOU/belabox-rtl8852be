@@ -81,5 +81,3 @@ Ein Kernel-Update mit anderer Versionsnummer wird nicht neu gebaut, dann bleibt 
 - `src/`: Treiberquelle mit den Anpassungen (ohne den Firmware-Ordner des Originals). `patches/belabox-5.10-compat.patch`: nur die Änderungen gegenüber dem Original.
 - `ANLEITUNG.md`, `ANLEITUNG.en.md`: Anleitung für Anwender.
 - `tests/`: automatische Tests (23), sie ändern nichts am System. `QUELLEN.md`: Herkunft und Lizenzen. `TESTSTAND.md`: was geprüft wurde.
-
-Mehr zu IRL4YOU auf <https://irl4you.de>.
